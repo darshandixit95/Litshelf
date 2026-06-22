@@ -1,0 +1,49 @@
+# ============================================================
+#  Auto-build /public/books/index.json
+#  Tu sirf books folder me JSON daal -> push kar.
+#  Yeh action khud index.json bana/update kar dega.
+#  index.json ko tu KABHI haath mat lagana.
+# ============================================================
+name: Build books index
+
+on:
+  push:
+    paths:
+      - "public/books/**"      # jab bhi books folder change ho
+  workflow_dispatch:            # manually bhi chala sakte ho
+
+permissions:
+  contents: write
+
+jobs:
+  build-index:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Generate index.json from book files
+        run: |
+          node -e '
+            const fs = require("fs");
+            const dir = "public/books";
+            if (!fs.existsSync(dir)) { console.log("no books dir"); process.exit(0); }
+            const ids = fs.readdirSync(dir)
+              .filter(f => f.endsWith(".json") && f !== "index.json")
+              .map(f => f.replace(/\.json$/, ""))
+              .sort();
+            fs.writeFileSync(dir + "/index.json", JSON.stringify(ids, null, 2) + "\n");
+            console.log("index.json updated:", ids);
+          '
+
+      - name: Commit updated index.json
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add public/books/index.json
+          if git diff --staged --quiet; then
+            echo "No changes to index.json"
+          else
+            git commit -m "chore: auto-update books index.json"
+            git push
+          fi
